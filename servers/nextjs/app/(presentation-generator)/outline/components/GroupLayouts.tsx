@@ -9,12 +9,14 @@ interface GroupLayoutsProps {
   group: LayoutGroup;
   onSelectLayoutGroup: (group: LayoutGroup) => void;
   selectedLayoutGroup: LayoutGroup | null;
+  getLayoutsByGroup: (groupId: string) => any[];
 }
 
 const GroupLayouts: React.FC<GroupLayoutsProps> = ({
   group,
   onSelectLayoutGroup,
   selectedLayoutGroup,
+  getLayoutsByGroup,
 }) => {
   const { getFullDataByGroup,getCustomTemplateFonts } = useLayout();
   const layoutGroup = getFullDataByGroup(group.id);
@@ -25,7 +27,11 @@ const GroupLayouts: React.FC<GroupLayoutsProps> = ({
     <div
       onClick={() => {
         trackEvent(MixpanelEvent.Group_Layout_Selected_Clicked, { pathname });
-        onSelectLayoutGroup(group);
+        const slides = getLayoutsByGroup(group.id);
+        onSelectLayoutGroup({
+          ...group,
+          slides: slides,
+        });
       }}
       className={`relative p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
         selectedLayoutGroup?.id === group.id

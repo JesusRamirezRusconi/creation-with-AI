@@ -37,6 +37,7 @@ import { usePresentationUndoRedo } from "../hooks/PresentationUndoRedo";
 import ToolTip from "@/components/ToolTip";
 import { clearPresentationData } from "@/store/slices/presentationGeneration";
 import { clearHistory } from "@/store/slices/undoRedoSlice";
+import AddQuestionsButton from "./AddQuestionsButton";
 
 const Header = ({
   presentation_id,
@@ -212,6 +213,12 @@ const Header = ({
           </ToolTip>
 
       </div>
+
+      {/* Add Questions Button */}
+      <AddQuestionsButton 
+        presentation_id={presentation_id}
+        disabled={isStreaming || !presentationData}
+      />
 
       {/* Present Button */}
       <Button

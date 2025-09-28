@@ -15,3 +15,13 @@ class PresentationOutlineModel(BaseModel):
             message += f"## Slide {i+1}:\n"
             message += f"  - Content: {slide} \n"
         return message
+
+
+class ThemeModel(BaseModel):
+    title: str
+    description: str
+    presentation: PresentationOutlineModel
+
+
+class ThemesResponseModel(BaseModel):
+    themes: List[ThemeModel]

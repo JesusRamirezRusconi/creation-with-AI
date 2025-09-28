@@ -6,6 +6,7 @@ import Link from "next/link";
 import BackBtn from "@/components/BackBtn";
 import { usePathname } from "next/navigation";
 import HeaderNav from "@/app/(presentation-generator)/components/HeaderNab";
+import ThemesDropdown from "./ThemesDropdown";
 import { Layout, FilePlus2 } from "lucide-react";
 import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
 const Header = () => {
@@ -35,6 +36,7 @@ const Header = () => {
               <FilePlus2 className="w-5 h-5" />
               <span className="text-sm font-medium font-inter">Create Template</span>
             </Link>
+            <ThemesDropdown />
             <Link
               href="/template-preview"
               prefetch={false}

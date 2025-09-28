@@ -60,7 +60,7 @@ export const metadata: Metadata = {
       },
     ],
     type: "website",
-    locale: "en_US",
+    locale: "es_ES",
   },
   alternates: {
     canonical: "https://presenton.ai",
@@ -81,7 +81,7 @@ export default function RootLayout({
 }>) {
 
   return (
-    <html lang="en">
+    <html lang="es">
       <body
         className={`${inter.variable} ${roboto.variable} ${instrument_sans.variable} antialiased`}
       >

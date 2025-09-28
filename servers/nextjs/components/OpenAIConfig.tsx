@@ -67,7 +67,7 @@ export default function OpenAIConfig({
         const data = await response.json();
         setAvailableModels(data);
         setModelsChecked(true);
-        onInputChange("gpt-4.1", "openai_model");
+        onInputChange("gpt-4o-mini", "openai_model");
       } else {
         console.error('Failed to fetch models');
         setAvailableModels([]);

@@ -148,6 +148,8 @@ export class PresentationGenerationApi {
 
   static async presentationPrepare(presentationData: any) {
     try {
+      console.log("Enviando datos de presentación:", presentationData);
+      
       const response = await fetch(
         `/api/v1/ppt/presentation/prepare`,
         {
@@ -157,6 +159,8 @@ export class PresentationGenerationApi {
           cache: "no-cache",
         }
       );
+      
+      console.log("Respuesta del servidor:", response.status, response.statusText);
       
       return await ApiResponseHandler.handleResponse(response, "Failed to prepare presentation");
     } catch (error) {

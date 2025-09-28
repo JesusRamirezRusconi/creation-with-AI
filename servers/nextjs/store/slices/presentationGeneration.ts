@@ -14,20 +14,134 @@ export interface PresentationData {
   slides: any;
 }
 
+interface ThemeCollection {
+  name: string;
+  themes: any[];
+  savedAt: string;
+  id: string;
+}
+
 interface PresentationGenerationState {
   presentation_id: string | null;
   isLoading: boolean;
   isStreaming: boolean | null;
   outlines: { content: string }[];
+  themes: any[];
+  savedThemes: any[]; // Para compatibilidad (deprecated)
+  themeCollections: ThemeCollection[]; // Colecciones de temas
+  selectedCollectionId: string | null; // ID de la colección seleccionada
+  selectedThemeIndex: number | null; // Índice del tema actualmente seleccionado
   error: string | null;
   presentationData: PresentationData | null;
   isSlidesRendered: boolean;
   isLayoutLoading: boolean;
 }
 
+// Helper function to load saved themes from localStorage
+const loadSavedThemesFromStorage = (): any[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const savedThemes = localStorage.getItem('presenton_saved_themes');
+      if (savedThemes) {
+        const parsedThemes = JSON.parse(savedThemes);
+        // Filtrar automáticamente temas de prueba
+        const filteredThemes = parsedThemes.filter((theme: any) =>
+          !theme.title?.includes('Prueba') &&
+          !theme.title?.includes('Test') &&
+          !theme.title?.includes('Demo') &&
+          theme.title !== 'Tema de Prueba 1' &&
+          theme.title !== 'Tema de Prueba 2'
+        );
+
+        // Si se filtraron temas, actualizar localStorage
+        if (filteredThemes.length !== parsedThemes.length) {
+          localStorage.setItem('presenton_saved_themes', JSON.stringify(filteredThemes));
+          console.log('Temas de prueba filtrados automáticamente');
+        }
+
+        return filteredThemes;
+      }
+      return [];
+    } catch (error) {
+      console.error('Error loading saved themes from localStorage:', error);
+      return [];
+    }
+  }
+  return [];
+};
+
+// Helper function to load selected theme index from localStorage
+const loadSelectedThemeIndexFromStorage = (): number | null => {
+  if (typeof window !== 'undefined') {
+    try {
+      const selectedIndex = localStorage.getItem('presenton_selected_theme_index');
+      return selectedIndex ? parseInt(selectedIndex, 10) : null;
+    } catch (error) {
+      console.error('Error loading selected theme index from localStorage:', error);
+      return null;
+    }
+  }
+  return null;
+};
+
+// Helper function to load theme collections from localStorage
+const loadThemeCollectionsFromStorage = (): ThemeCollection[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const collections = localStorage.getItem('presenton_theme_collections');
+      if (collections) {
+        const parsedCollections = JSON.parse(collections);
+        // Filtrar temas de prueba de cada colección
+        const filteredCollections = parsedCollections.map((collection: ThemeCollection) => ({
+          ...collection,
+          themes: collection.themes.filter((theme: any) =>
+            !theme.title?.includes('Prueba') &&
+            !theme.title?.includes('Test') &&
+            !theme.title?.includes('Demo') &&
+            theme.title !== 'Tema de Prueba 1' &&
+            theme.title !== 'Tema de Prueba 2'
+          )
+        })).filter((collection: ThemeCollection) => collection.themes.length > 0); // Solo mantener colecciones que tengan temas
+
+        // Si se filtraron temas, actualizar localStorage
+        if (JSON.stringify(filteredCollections) !== collections) {
+          localStorage.setItem('presenton_theme_collections', JSON.stringify(filteredCollections));
+          console.log('Temas de prueba filtrados de colecciones automáticamente');
+        }
+
+        return filteredCollections;
+      }
+      return [];
+    } catch (error) {
+      console.error('Error loading theme collections from localStorage:', error);
+      return [];
+    }
+  }
+  return [];
+};
+
+// Helper function to load selected collection ID from localStorage
+const loadSelectedCollectionIdFromStorage = (): string | null => {
+  if (typeof window !== 'undefined') {
+    try {
+      const selectedId = localStorage.getItem('presenton_selected_collection_id');
+      return selectedId || null;
+    } catch (error) {
+      console.error('Error loading selected collection ID from localStorage:', error);
+      return null;
+    }
+  }
+  return null;
+};
+
 const initialState: PresentationGenerationState = {
   presentation_id: null,
   outlines: [],
+  themes: [],
+  savedThemes: loadSavedThemesFromStorage(),
+  themeCollections: loadThemeCollectionsFromStorage(),
+  selectedCollectionId: loadSelectedCollectionIdFromStorage(),
+  selectedThemeIndex: loadSelectedThemeIndexFromStorage(),
   isSlidesRendered: false,
   isLayoutLoading: false,
   isLoading: false,
@@ -75,6 +189,141 @@ const presentationGenerationSlice = createSlice({
     setOutlines: (state, action: PayloadAction<{ content: string }[]>) => {
       state.outlines = action.payload;
     },
+    // Set themes
+    setThemes: (state, action: PayloadAction<any[]>) => {
+      state.themes = action.payload;
+    },
+    // Save all generated themes
+    setSavedThemes: (state, action: PayloadAction<any[]>) => {
+      state.savedThemes = action.payload;
+      // Persist to localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('presenton_saved_themes', JSON.stringify(action.payload));
+        } catch (error) {
+          console.error('Error saving themes to localStorage:', error);
+        }
+      }
+    },
+    // Set selected theme index
+    setSelectedThemeIndex: (state, action: PayloadAction<number | null>) => {
+      state.selectedThemeIndex = action.payload;
+      // Persist to localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('presenton_selected_theme_index', 
+            action.payload !== null ? action.payload.toString() : '');
+        } catch (error) {
+          console.error('Error saving selected theme index to localStorage:', error);
+        }
+      }
+    },
+    // Select theme and update outlines
+    selectTheme: (state, action: PayloadAction<{ themeIndex: number }>) => {
+      const { themeIndex } = action.payload;
+      if (state.savedThemes && state.savedThemes[themeIndex]) {
+        const selectedTheme = state.savedThemes[themeIndex];
+        state.selectedThemeIndex = themeIndex;
+        
+        // Persist selected theme index to localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('presenton_selected_theme_index', themeIndex.toString());
+          } catch (error) {
+            console.error('Error saving selected theme index to localStorage:', error);
+          }
+        }
+        
+        // Update outlines from the selected theme's presentation slides
+        if (selectedTheme.presentation && selectedTheme.presentation.slides) {
+          state.outlines = selectedTheme.presentation.slides;
+          // Generate a temporary presentation_id if we don't have one
+          if (!state.presentation_id) {
+            state.presentation_id = `theme-${Date.now()}`;
+          }
+        }
+      }
+    },
+    // Save theme collection
+    saveThemeCollection: (state, action: PayloadAction<{ name: string; themes: any[] }>) => {
+      const { name, themes } = action.payload;
+      const newCollection: ThemeCollection = {
+        id: Date.now().toString(),
+        name,
+        themes,
+        savedAt: new Date().toISOString()
+      };
+      
+      state.themeCollections.push(newCollection);
+      
+      // Persist to localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('presenton_theme_collections', JSON.stringify(state.themeCollections));
+        } catch (error) {
+          console.error('Error saving theme collections to localStorage:', error);
+        }
+      }
+    },
+    // Select theme collection
+    selectThemeCollection: (state, action: PayloadAction<{ collectionId: string; themeIndex?: number }>) => {
+      const { collectionId, themeIndex = 0 } = action.payload;
+      const collection = state.themeCollections.find(c => c.id === collectionId);
+      
+      if (collection && collection.themes.length > 0) {
+        state.selectedCollectionId = collectionId;
+        state.selectedThemeIndex = themeIndex;
+        
+          // Update outlines from the selected theme
+          const selectedTheme = collection.themes[themeIndex];
+          if (selectedTheme && selectedTheme.presentation && selectedTheme.presentation.slides) {
+            state.outlines = selectedTheme.presentation.slides;
+            // Generate a temporary presentation_id if we don't have one
+            if (!state.presentation_id) {
+              state.presentation_id = `theme-${Date.now()}`;
+            }
+          }
+        
+        // Persist to localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('presenton_selected_collection_id', collectionId);
+            localStorage.setItem('presenton_selected_theme_index', themeIndex.toString());
+          } catch (error) {
+            console.error('Error saving selection to localStorage:', error);
+          }
+        }
+      }
+    },
+    // Select theme within current collection
+    selectThemeInCollection: (state, action: PayloadAction<{ themeIndex: number }>) => {
+      const { themeIndex } = action.payload;
+      if (state.selectedCollectionId) {
+        const collection = state.themeCollections.find(c => c.id === state.selectedCollectionId);
+        if (collection && collection.themes[themeIndex]) {
+          state.selectedThemeIndex = themeIndex;
+          
+          // Update outlines from the selected theme
+          const selectedTheme = collection.themes[themeIndex];
+          if (selectedTheme.presentation && selectedTheme.presentation.slides) {
+            state.outlines = selectedTheme.presentation.slides;
+            // Generate a temporary presentation_id if we don't have one
+            if (!state.presentation_id) {
+              state.presentation_id = `theme-${Date.now()}`;
+            }
+          }
+          
+          // Persist to localStorage
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('presenton_selected_theme_index', themeIndex.toString());
+            } catch (error) {
+              console.error('Error saving selected theme index to localStorage:', error);
+            }
+          }
+        }
+      }
+    },
     // Set presentation data
     setPresentationData: (state, action: PayloadAction<PresentationData>) => {
       state.presentationData = action.payload;
@@ -85,6 +334,42 @@ const presentationGenerationSlice = createSlice({
         state.outlines = state.outlines.filter(
           (_, idx) => idx !== action.payload.index
         );
+      }
+    },
+    // Limpiar temas de prueba
+    cleanTestThemes: (state) => {
+      // Filtrar temas de prueba de savedThemes
+      const filteredSavedThemes = state.savedThemes.filter((theme: any) =>
+        !theme.title?.includes('Prueba') &&
+        !theme.title?.includes('Test') &&
+        !theme.title?.includes('Demo') &&
+        theme.title !== 'Tema de Prueba 1' &&
+        theme.title !== 'Tema de Prueba 2'
+      );
+
+      // Filtrar temas de prueba de themeCollections
+      const filteredCollections = state.themeCollections.map((collection: ThemeCollection) => ({
+        ...collection,
+        themes: collection.themes.filter((theme: any) =>
+          !theme.title?.includes('Prueba') &&
+          !theme.title?.includes('Test') &&
+          !theme.title?.includes('Demo') &&
+          theme.title !== 'Tema de Prueba 1' &&
+          theme.title !== 'Tema de Prueba 2'
+        )
+      })).filter((collection: ThemeCollection) => collection.themes.length > 0);
+
+      state.savedThemes = filteredSavedThemes;
+      state.themeCollections = filteredCollections;
+
+      // Limpiar localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('presenton_saved_themes', JSON.stringify(filteredSavedThemes));
+          localStorage.setItem('presenton_theme_collections', JSON.stringify(filteredCollections));
+        } catch (error) {
+          console.error('Error cleaning localStorage:', error);
+        }
       }
     },
     // SLIDE OPERATIONS
@@ -392,6 +677,16 @@ export const {
   deleteSlideOutline,
   setPresentationData,
   setOutlines,
+  setThemes,
+  setSavedThemes,
+  setSelectedThemeIndex,
+  selectTheme,
+  // Theme collections
+  saveThemeCollection,
+  selectThemeCollection,
+  selectThemeInCollection,
+  // Clean test themes
+  cleanTestThemes,
   // slides operations
   addSlide,
   updateSlide,

@@ -18,6 +18,7 @@ export interface LoadingState {
 
 export const TABS = {
   OUTLINE: 'outline',
+  THEMES: 'themes',
   LAYOUTS: 'layouts'
 } as const;
 

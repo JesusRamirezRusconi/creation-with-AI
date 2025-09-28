@@ -169,6 +169,51 @@ async def create_presentation(
     return presentation
 
 
+@PRESENTATION_ROUTER.post("/create-from-theme")
+async def create_presentation_from_theme(
+    outlines: Annotated[List[dict], Body()],
+    title: Annotated[str, Body()],
+    language: Annotated[str, Body()] = "en",
+    n_slides: Annotated[int, Body()] = 10,
+    sql_session: AsyncSession = Depends(get_async_session),
+):
+    """Create a temporary presentation from theme outlines"""
+    try:
+        # Create a new presentation
+        presentation = PresentationModel(
+            title=title,
+            language=language,
+            n_slides=n_slides,
+            content="Presentación creada desde tema guardado",
+            tone=Tone.PROFESSIONAL,
+            verbosity=Verbosity.CONCISE,
+            include_title_slide=True,
+            include_table_of_contents=False,
+            web_search=False,
+        )
+        
+        # Convert outlines to proper format
+        slide_outlines = []
+        for outline in outlines:
+            if isinstance(outline, dict) and 'content' in outline:
+                slide_outlines.append(SlideOutlineModel(content=outline['content']))
+            else:
+                slide_outlines.append(SlideOutlineModel(content=str(outline)))
+        
+        presentation_outline_model = PresentationOutlineModel(slides=slide_outlines)
+        presentation.outlines = presentation_outline_model.model_dump(mode="json")
+        
+        sql_session.add(presentation)
+        await sql_session.commit()
+        await sql_session.refresh(presentation)
+        
+        return {"id": str(presentation.id), "title": presentation.title}
+        
+    except Exception as e:
+        await sql_session.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating presentation: {str(e)}")
+
+
 @PRESENTATION_ROUTER.post("/prepare", response_model=PresentationModel)
 async def prepare_presentation(
     presentation_id: Annotated[uuid.UUID, Body()],
@@ -188,6 +233,59 @@ async def prepare_presentation(
 
     total_slide_layouts = len(layout.slides)
     total_outlines = len(outlines)
+
+    # Si hay más outlines que layouts, agregar automáticamente un layout de preguntas
+    if total_outlines > total_slide_layouts:
+        from models.presentation_layout import SlideLayoutModel
+
+        # Crear layout de preguntas
+        questions_layout = SlideLayoutModel(
+            id='questions-quiz-slide',
+            name='questions',
+            description='Evaluación de Conocimientos',
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "presentationContent": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Contenido completo de la presentación para generar preguntas relevantes"
+                    },
+                    "title": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 50,
+                        "default": "Evaluación de Conocimientos",
+                        "description": "Título de la evaluación"
+                    },
+                    "description": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 200,
+                        "default": "Responde las siguientes preguntas para evaluar tu comprensión del contenido presentado.",
+                        "description": "Descripción de la evaluación"
+                    },
+                    "customQuestions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "question": {"type": "string"},
+                                "options": {"type": "array", "items": {"type": "string"}},
+                                "correctAnswer": {"type": "number"},
+                                "explanation": {"type": "string"}
+                            }
+                        },
+                        "description": "Preguntas personalizadas (opcional)"
+                    }
+                }
+            }
+        )
+
+        # Agregar el layout de preguntas temporalmente
+        layout.slides.append(questions_layout)
+        total_slide_layouts = len(layout.slides)  # Actualizar el contador
+        print(f"📝 Agregado layout de preguntas automáticamente. Total layouts: {total_slide_layouts}")
 
     if layout.ordered:
         presentation_structure = layout.to_presentation_structure()
@@ -291,15 +389,114 @@ async def stream_presentation(
         for i, slide_layout_index in enumerate(structure.slides):
             slide_layout = layout.slides[slide_layout_index]
 
+            # Verificar si este es el último slide y es de preguntas
+            is_last_slide = i == len(structure.slides) - 1
+            is_questions_slide = slide_layout.id == "questions-quiz-slide" or slide_layout.name == "questions"
+
             try:
-                slide_content = await get_slide_content_from_type_and_outline(
-                    slide_layout,
-                    outline.slides[i],
-                    presentation.language,
-                    presentation.tone,
-                    presentation.verbosity,
-                    presentation.instructions,
-                )
+                if is_last_slide and is_questions_slide and slides:
+                    # Generar preguntas con IA basadas en el contenido de todos los slides anteriores
+                    from utils.llm_calls.generate_questions_from_content import generate_questions_from_presentation_content
+
+                    # Extraer contenido de todos los slides generados
+                    presentation_content_parts = []
+                    for prev_slide in slides:
+                        if prev_slide.content:
+                            # Extraer contenido significativo del slide
+                            content = prev_slide.content
+                            content_fields = ['title', 'content', 'text', 'description', 'subtitle', 'body', 'mainContent']
+                            slide_content = []
+
+                            # Primero intentar campos específicos
+                            for field in content_fields:
+                                if field in content and content[field]:
+                                    value = content[field]
+                                    if isinstance(value, str) and len(value.strip()) > 0:
+                                        slide_content.append(str(value))
+                                    elif isinstance(value, list) and value:
+                                        # Si es una lista, unir los elementos
+                                        slide_content.append(' '.join(str(v) for v in value if v))
+
+                            # Si no encontramos contenido específico, buscar cualquier campo de texto
+                            if not slide_content:
+                                for key, value in content.items():
+                                    if key.startswith('__'):  # Saltar campos internos como __speaker_note__
+                                        continue
+                                    if isinstance(value, str) and len(value.strip()) > 50:  # Solo texto largo
+                                        slide_content.append(value)
+                                    elif isinstance(value, list) and value:
+                                        for item in value:
+                                            if isinstance(item, str) and len(item.strip()) > 20:
+                                                slide_content.append(item)
+
+                            if slide_content:
+                                presentation_content_parts.extend(slide_content)
+                                print(f"📄 Slide {len(presentation_content_parts)}: extraído {len(' '.join(slide_content))} caracteres")
+
+                    presentation_content = "\n\n".join(presentation_content_parts)
+
+                    if not presentation_content.strip():
+                        presentation_content = "Esta presentación contiene información valiosa que puede ser evaluada mediante las siguientes preguntas."
+
+                    print(f"🤖 Generando preguntas con IA para presentación final...")
+                    print(f"📝 Contenido extraído: {presentation_content[:200]}...")
+                    print(f"📊 Longitud del contenido: {len(presentation_content)} caracteres")
+                    print(f"🌍 Idioma: {presentation.language or 'es'}")
+
+                    # Generar preguntas con IA usando los outlines originales
+                    outlines_list = [{"content": slide.content} for slide in outline.slides]
+                    try:
+                        generated_questions = await generate_questions_from_presentation_content(
+                            presentation_content=presentation_content,
+                            num_questions=5,
+                            language=presentation.language or "es",
+                            outlines=outlines_list
+                        )
+
+                        print(f"✅ Generadas {len(generated_questions)} preguntas específicas con IA")
+                        if generated_questions:
+                            print(f"📋 Primera pregunta generada: {generated_questions[0]['question'][:100]}...")
+                            print(f"🔢 Formato correcto: {'id' in generated_questions[0]}")
+                        else:
+                            print("❌ No se generaron preguntas")
+
+                    except Exception as e:
+                        print(f"❌ Error generando preguntas con IA: {str(e)}")
+                        print("🔄 Usando preguntas de respaldo basadas en contenido extraído")
+
+                        # Generar preguntas de respaldo basadas en los outlines
+                        from utils.llm_calls.generate_questions_from_content import generate_fallback_questions
+                        generated_questions = generate_fallback_questions(
+                            presentation_content,
+                            5,
+                            presentation.language or "es",
+                            outlines_list
+                        )
+                        print(f"✅ Generadas {len(generated_questions)} preguntas de respaldo")
+
+                    # Crear contenido del slide de preguntas
+                    slide_content = {
+                        "presentationContent": presentation_content,
+                        "title": "🎯 Evaluación de Conocimientos",
+                        "description": "Responde las siguientes preguntas para evaluar tu comprensión del contenido presentado.",
+                        "customQuestions": generated_questions,
+                        "__speaker_note__": "Esta es una evaluación interactiva basada en el contenido de la presentación. Los usuarios pueden responder las preguntas y obtener retroalimentación inmediata."
+                    }
+
+                    print(f"📦 Contenido final del slide de preguntas:")
+                    print(f"   - Preguntas personalizadas: {len(generated_questions)}")
+                    print(f"   - Contenido de presentación: {len(presentation_content)} chars")
+                    print(f"   - Primera pregunta: {generated_questions[0]['question'][:50] if generated_questions else 'N/A'}...")
+                else:
+                    # Generar contenido normal del slide
+                    slide_content = await get_slide_content_from_type_and_outline(
+                        slide_layout,
+                        outline.slides[i],
+                        presentation.language,
+                        presentation.tone,
+                        presentation.verbosity,
+                        presentation.instructions,
+                    )
             except HTTPException as e:
                 yield SSEErrorResponse(detail=e.detail).to_string()
                 return

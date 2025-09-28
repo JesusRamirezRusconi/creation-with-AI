@@ -20,6 +20,7 @@ class PresentationModel(SQLModel, table=True):
     title: Optional[str] = None
     file_paths: Optional[List[str]] = Field(sa_column=Column(JSON), default=None)
     outlines: Optional[dict] = Field(sa_column=Column(JSON), default=None)
+    themes: Optional[dict] = Field(sa_column=Column(JSON), default=None)
     created_at: datetime = Field(
         sa_column=Column(
             DateTime(timezone=True), nullable=False, default=get_current_utc_datetime
@@ -51,6 +52,7 @@ class PresentationModel(SQLModel, table=True):
             title=self.title,
             file_paths=self.file_paths,
             outlines=self.outlines,
+            themes=self.themes,
             layout=self.layout,
             structure=self.structure,
             instructions=self.instructions,

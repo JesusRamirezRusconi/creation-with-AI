@@ -208,6 +208,7 @@ const LayoutSelection: React.FC<LayoutSelectionProps> = ({
               group={group}
               onSelectLayoutGroup={handleLayoutGroupSelection}
               selectedLayoutGroup={selectedLayoutGroup}
+              getLayoutsByGroup={getLayoutsByGroup}
             />
           ))}
         </div>
@@ -232,6 +233,7 @@ const LayoutSelection: React.FC<LayoutSelectionProps> = ({
                 group={group}
                 onSelectLayoutGroup={handleLayoutGroupSelection}
                 selectedLayoutGroup={selectedLayoutGroup}
+                getLayoutsByGroup={getLayoutsByGroup}
               />
             ))}
           </div>
