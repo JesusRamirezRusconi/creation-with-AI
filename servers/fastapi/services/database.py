@@ -20,6 +20,7 @@ from models.sql.presentation_layout_code import PresentationLayoutCodeModel
 from models.sql.template import TemplateModel
 from models.sql.webhook_subscription import WebhookSubscription
 from utils.db_utils import get_database_url_and_connect_args
+from utils.get_env import get_container_db_url_env
 
 
 database_url, connect_args = get_database_url_and_connect_args()
@@ -34,7 +35,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 # Container DB (Lives inside the container)
-container_db_url = "sqlite+aiosqlite:////app/container.db"
+container_db_url = get_container_db_url_env() or "sqlite+aiosqlite:////app/container.db"
 container_db_engine: AsyncEngine = create_async_engine(
     container_db_url, connect_args={"check_same_thread": False}
 )

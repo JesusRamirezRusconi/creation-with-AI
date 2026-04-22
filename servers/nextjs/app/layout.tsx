@@ -6,6 +6,7 @@ import { Providers } from "./providers";
 import MixpanelInitializer from "./MixpanelInitializer";
 import { LayoutProvider } from "./(presentation-generator)/context/LayoutContext";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/components/AuthProvider";
 const inter = localFont({
   src: [
     {
@@ -85,13 +86,15 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${roboto.variable} ${instrument_sans.variable} antialiased`}
       >
-        <Providers>
-          <MixpanelInitializer>
-            <LayoutProvider>
-              {children}
-            </LayoutProvider>
-          </MixpanelInitializer>
-        </Providers>
+        <AuthProvider>
+          <Providers>
+            <MixpanelInitializer>
+              <LayoutProvider>
+                {children}
+              </LayoutProvider>
+            </MixpanelInitializer>
+          </Providers>
+        </AuthProvider>
         <Toaster position="top-center" />
       </body>
     </html>

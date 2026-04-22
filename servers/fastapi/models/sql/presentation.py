@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 import uuid
-from sqlalchemy import JSON, Column, DateTime, String
+from sqlalchemy import JSON, Column, DateTime, String, Text
 from sqlmodel import Boolean, Field, SQLModel
 
 from models.presentation_layout import PresentationLayoutModel
@@ -14,10 +14,10 @@ class PresentationModel(SQLModel, table=True):
     __tablename__ = "presentations"
 
     id: uuid.UUID = Field(primary_key=True, default_factory=uuid.uuid4)
-    content: str
+    content: str = Field(sa_column=Column(Text))
     n_slides: int
-    language: str
-    title: Optional[str] = None
+    language: str = Field(max_length=50)
+    title: Optional[str] = Field(sa_column=Column(String(500)), default=None)
     file_paths: Optional[List[str]] = Field(sa_column=Column(JSON), default=None)
     outlines: Optional[dict] = Field(sa_column=Column(JSON), default=None)
     themes: Optional[dict] = Field(sa_column=Column(JSON), default=None)
@@ -36,9 +36,9 @@ class PresentationModel(SQLModel, table=True):
     )
     layout: Optional[dict] = Field(sa_column=Column(JSON), default=None)
     structure: Optional[dict] = Field(sa_column=Column(JSON), default=None)
-    instructions: Optional[str] = Field(sa_column=Column(String), default=None)
-    tone: Optional[str] = Field(sa_column=Column(String), default=None)
-    verbosity: Optional[str] = Field(sa_column=Column(String), default=None)
+    instructions: Optional[str] = Field(sa_column=Column(String(2000)), default=None)
+    tone: Optional[str] = Field(sa_column=Column(String(100)), default=None)
+    verbosity: Optional[str] = Field(sa_column=Column(String(100)), default=None)
     include_table_of_contents: bool = Field(sa_column=Column(Boolean), default=False)
     include_title_slide: bool = Field(sa_column=Column(Boolean), default=True)
     web_search: bool = Field(sa_column=Column(Boolean), default=False)

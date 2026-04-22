@@ -100,6 +100,10 @@ services:
       - WEB_GROUNDING=${WEB_GROUNDING}
       - DATABASE_URL=${DATABASE_URL}
       - DISABLE_ANONYMOUS_TRACKING=${DISABLE_ANONYMOUS_TRACKING}
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   development-gpu:
     build:

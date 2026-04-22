@@ -4,6 +4,7 @@ import asyncio
 import traceback
 from urllib.parse import urljoin
 import time
+import os
 
 import httpx
 from fastmcp import FastMCP
@@ -18,7 +19,10 @@ async def main():
         print("DEBUG: MCP (OpenAPI) Server startup initiated")
         parser = argparse.ArgumentParser(description="Run the MCP server (from OpenAPI)")
         parser.add_argument(
-            "--port", type=int, default=8001, help="Port for the MCP HTTP server"
+            "--port", 
+            type=int, 
+            default=int(os.getenv("MCP_PORT", "8001")), 
+            help="Port for the MCP HTTP server"
         )
 
         parser.add_argument(
@@ -33,7 +37,9 @@ async def main():
         )
 
         # Create an HTTP client that the MCP server will use to call the API
-        api_client = httpx.AsyncClient(base_url="http://127.0.0.1:8000", timeout=60.0)
+        api_base_url = os.getenv("FASTAPI_INTERNAL_URL", "http://127.0.0.1:8000")
+        api_timeout = float(os.getenv("HTTP_CLIENT_TIMEOUT", "60.0"))
+        api_client = httpx.AsyncClient(base_url=api_base_url, timeout=api_timeout)
 
         # Build MCP server from OpenAPI
         print("DEBUG: Creating FastMCP server from OpenAPI spec...")

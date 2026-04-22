@@ -95,3 +95,23 @@ def get_extended_reasoning_env():
 
 def get_web_grounding_env():
     return os.getenv("WEB_GROUNDING")
+
+
+def get_mcp_port_env():
+    return os.getenv("MCP_PORT")
+
+
+def get_fastapi_internal_url_env():
+    return os.getenv("FASTAPI_INTERNAL_URL")
+
+
+def get_nextjs_internal_url_env():
+    return os.getenv("NEXTJS_INTERNAL_URL")
+
+
+def get_http_client_timeout_env():
+    return os.getenv("HTTP_CLIENT_TIMEOUT")
+
+
+def get_container_db_url_env():
+    return os.getenv("CONTAINER_DB_URL")
